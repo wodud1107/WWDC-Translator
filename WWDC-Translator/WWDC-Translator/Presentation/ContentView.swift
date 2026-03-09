@@ -221,26 +221,31 @@ struct ContentView: View {
         }
     }
     
-    // 배치 번역 수행
+    // 배치 번역 수행 (XML 태그 보호 로직 적용)
     private func performTranslation() async {
         let batchSize = 30
         let totalCount = subtitles.count
         
         for i in stride(from: 0, to: totalCount, by: batchSize) {
             let end = min(i + batchSize, totalCount)
-            let chunk = subtitles[i..<end]
+            let chunk = Array(subtitles[i..<end])
             
-            // 구분자(|||)와 함께 텍스트 병합하여 API 호출 최소화
-            let combinedText = chunk.map { $0.text }.joined(separator: "\n|||\n")
+            // 각 문장을 <sN> 태그로 감싸서 전송 (DeepL이 문장을 합치는 것을 방지)
+            var xmlText = ""
+            for (index, subtitle) in chunk.enumerated() {
+                xmlText += "<s\(index)>\(subtitle.text)</s\(index)> "
+            }
             
             do {
-                let translatedCombined = try await deepLService.translate(combinedText)
-                let translatedLines = translatedCombined.components(separatedBy: "|||")
+                let translatedXML = try await deepLService.translate(xmlText)
                 
                 await MainActor.run {
                     for (index, subIndex) in (i..<end).enumerated() {
-                        if index < translatedLines.count {
-                            subtitles[subIndex].translatedText = translatedLines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+                        let tag = "s\(index)"
+                        if let translatedSentence = extractText(from: translatedXML, tag: tag) {
+                            subtitles[subIndex].translatedText = translatedSentence
+                        } else {
+                            subtitles[subIndex].translatedText = subtitles[subIndex].text
                         }
                     }
                     self.translationProgress = Double(end) / Double(totalCount)
@@ -249,7 +254,22 @@ struct ContentView: View {
                 print("❌ 번역 중 에러: \(error)")
             }
         }
-        print("✅ 모든 자막 번역 완료!")
+    }
+    
+    // XML 태그 내부 텍스트 추출 헬퍼
+    private func extractText(from xml: String, tag: String) -> String? {
+        let startTag = "<\(tag)>"
+        let endTag = "</\(tag)>"
+        
+        guard let startRange = xml.range(of: startTag),
+              let endRange = xml.range(of: endTag) else { return nil }
+        
+        return String(xml[startRange.upperBound..<endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
     }
 }
 
