@@ -6,8 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		4B0077732F5F007100CFD074 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4B0077502F5EEEC900CFD074 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4B0077572F5EEEC900CFD074;
+			remoteInfo = "WWDC-Translator";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		4B0077582F5EEEC900CFD074 /* WWDC-Translator.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "WWDC-Translator.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		4B00776F2F5F007100CFD074 /* WWDC-TranslatorTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "WWDC-TranslatorTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -16,10 +27,22 @@
 			path = "WWDC-Translator";
 			sourceTree = "<group>";
 		};
+		4B0077702F5F007100CFD074 /* WWDC-TranslatorTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "WWDC-TranslatorTests";
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		4B0077552F5EEEC900CFD074 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B00776C2F5F007100CFD074 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +56,7 @@
 			isa = PBXGroup;
 			children = (
 				4B00775A2F5EEEC900CFD074 /* WWDC-Translator */,
+				4B0077702F5F007100CFD074 /* WWDC-TranslatorTests */,
 				4B0077592F5EEEC900CFD074 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				4B0077582F5EEEC900CFD074 /* WWDC-Translator.app */,
+				4B00776F2F5F007100CFD074 /* WWDC-TranslatorTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +95,29 @@
 			productReference = 4B0077582F5EEEC900CFD074 /* WWDC-Translator.app */;
 			productType = "com.apple.product-type.application";
 		};
+		4B00776E2F5F007100CFD074 /* WWDC-TranslatorTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4B0077752F5F007100CFD074 /* Build configuration list for PBXNativeTarget "WWDC-TranslatorTests" */;
+			buildPhases = (
+				4B00776B2F5F007100CFD074 /* Sources */,
+				4B00776C2F5F007100CFD074 /* Frameworks */,
+				4B00776D2F5F007100CFD074 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4B0077742F5F007100CFD074 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4B0077702F5F007100CFD074 /* WWDC-TranslatorTests */,
+			);
+			name = "WWDC-TranslatorTests";
+			packageProductDependencies = (
+			);
+			productName = "WWDC-TranslatorTests";
+			productReference = 4B00776F2F5F007100CFD074 /* WWDC-TranslatorTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -82,6 +130,10 @@
 				TargetAttributes = {
 					4B0077572F5EEEC900CFD074 = {
 						CreatedOnToolsVersion = 26.1.1;
+					};
+					4B00776E2F5F007100CFD074 = {
+						CreatedOnToolsVersion = 26.1.1;
+						TestTargetID = 4B0077572F5EEEC900CFD074;
 					};
 				};
 			};
@@ -100,12 +152,20 @@
 			projectRoot = "";
 			targets = (
 				4B0077572F5EEEC900CFD074 /* WWDC-Translator */,
+				4B00776E2F5F007100CFD074 /* WWDC-TranslatorTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4B0077562F5EEEC900CFD074 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4B00776D2F5F007100CFD074 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +182,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4B00776B2F5F007100CFD074 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4B0077742F5F007100CFD074 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4B0077572F5EEEC900CFD074 /* WWDC-Translator */;
+			targetProxy = 4B0077732F5F007100CFD074 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4B0077612F5EEEC900CFD074 /* Debug */ = {
@@ -328,6 +403,62 @@
 			};
 			name = Release;
 		};
+		4B0077762F5F007100CFD074 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3GQ9G2SN2J;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "JY.WWDC-TranslatorTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WWDC-Translator.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WWDC-Translator";
+			};
+			name = Debug;
+		};
+		4B0077772F5F007100CFD074 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3GQ9G2SN2J;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "JY.WWDC-TranslatorTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WWDC-Translator.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/WWDC-Translator";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -345,6 +476,15 @@
 			buildConfigurations = (
 				4B0077642F5EEEC900CFD074 /* Debug */,
 				4B0077652F5EEEC900CFD074 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4B0077752F5F007100CFD074 /* Build configuration list for PBXNativeTarget "WWDC-TranslatorTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4B0077762F5F007100CFD074 /* Debug */,
+				4B0077772F5F007100CFD074 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
