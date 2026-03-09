@@ -41,7 +41,9 @@ struct VideoPlayerView: View {
                     Text(text)
                         .font(.title2)
                         .bold()
+                        .lineLimit(nil)
                         .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.vertical, 10)
                         .padding(.horizontal, 20)
                         .background(Color.black.opacity(0.7))
@@ -55,9 +57,6 @@ struct VideoPlayerView: View {
             }
         }
         .edgesIgnoringSafeArea(.all)
-        #if os(macOS)
-        .frame(minWidth: 800, minHeight: 600)
-        #endif
         .overlay(alignment: .topLeading) {
             Button {
                 player.pause()
@@ -65,7 +64,7 @@ struct VideoPlayerView: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.largeTitle)
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(.white.opacity(0.2))
                     .padding()
             }
             .buttonStyle(.plain)
