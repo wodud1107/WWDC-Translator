@@ -15,9 +15,9 @@ struct ContentView: View {
     @State private var page = WebPage()
     @State private var isExtracting: Bool = false
     
-    // 추출된 데이터
+    // 추출된 데이터 저장
     @State private var m3u8URL: String?
-    @State private var scrapedSubtitles: [[String: Any]] = []
+    @State private var subtitles: [Subtitle] = []
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -100,7 +100,7 @@ struct ContentView: View {
         if let newURL = URL(string: sessionURLString) {
             page.load(newURL)
             self.m3u8URL = nil
-            self.scrapedSubtitles = []
+            self.subtitles = []
         }
     }
     
@@ -116,13 +116,9 @@ struct ContentView: View {
             // 1. 비디오 URL 추출 (meta 우선, video 차선)
             var metaVideo = document.querySelector('meta[property="og:video"]');
             var m3u8 = metaVideo ? metaVideo.content : "";
-            if (!m3u8) {
-                var video = document.getElementById('video') || document.querySelector('video');
-                m3u8 = video ? video.src : "";
-            }
             
             // 2. 자막 텍스트 추출
-            var sentences = document.querySelectorAll('#transcript-content .sentence, .supplement.transcript .sentence');
+            var sentences = document.querySelectorAll('#transcript-content .sentence, .supplement.transcript .sentence, .sentence');
             var results = [];
             
             for (var i = 0; i < sentences.length; i++) {
@@ -130,14 +126,14 @@ struct ContentView: View {
                 var timeSpan = s.querySelector('[data-start]');
                 var start = timeSpan ? timeSpan.getAttribute('data-start') : (s.getAttribute('data-start-time') || "0");
                 
-                // 텍스트 추출 (textContent 사용으로 부작용 방지)
+                // 텍스트 추출
                 var text = s.textContent.trim();
                 if (text.length > 0) {
                     results.push(start + "|" + text);
                 }
             }
             
-            if (results.length === 0) return "ERROR:NO_DATA_IN_DOM";
+            if (results.length === 0) return "ERROR:NO_DATA";
             
             return m3u8 + "###" + results.join("@@@");
         } catch (e) {
@@ -146,51 +142,40 @@ struct ContentView: View {
         """
         
         do {
-            let result = try await page.callJavaScript(dataScript)
-            print("📦 수신값 수신 완료")
-            
-            guard let rawString = result as? String else {
-                print("❌ 결과 수신 실패 (타입 불일치)")
+            guard let rawString = try await page.callJavaScript(dataScript) as? String,
+                  !rawString.hasPrefix("ERROR:") else {
+                print("⚠️ 자막 데이터를 가져오지 못했습니다.")
                 return
             }
             
-            if rawString.hasPrefix("ERROR:") {
-                print("⚠️ 안내: \(rawString) (전사문 로딩을 위해 잠시만 기다린 후 다시 시도하세요)")
-                return
-            }
-            
-            // 3. 파싱 및 데이터 저장
             let components = rawString.components(separatedBy: "###")
             self.m3u8URL = components.first == "" ? nil : components.first
             
             if components.count > 1 {
                 let lines = components[1].components(separatedBy: "@@@")
-                var newSubs: [[String: Any]] = []
+                var newSubtitles: [Subtitle] = []
                 
                 for line in lines {
                     let parts = line.components(separatedBy: "|")
                     if parts.count == 2 {
-                        newSubs.append([
-                            "startTime": Double(parts[0]) ?? 0.0,
-                            "text": parts[1]
-                        ])
+                        newSubtitles.append(Subtitle(startTime: Double(parts[0]) ?? 0.0, endTime: 0.0, text: parts[1]))
                     }
                 }
                 
                 // 종료 시간 계산
-                for i in 0..<newSubs.count {
-                    if i < newSubs.count - 1 {
-                        newSubs[i]["endTime"] = newSubs[i+1]["startTime"]
+                for i in 0..<newSubtitles.count {
+                    if i < newSubtitles.count - 1 {
+                        newSubtitles[i].endTime = newSubtitles[i+1].startTime
                     } else {
-                        newSubs[i]["endTime"] = (newSubs[i]["startTime"] as? Double ?? 0.0) + 3.0
+                        newSubtitles[i].endTime = newSubtitles[i].startTime + 3.0
                     }
                 }
                 
-                self.scrapedSubtitles = newSubs
-                print("✅ 추출 성공! 총 \(self.scrapedSubtitles.count)개의 문장을 확보했습니다.")
+                self.subtitles = newSubtitles
+                print("✅ 성공: \(self.subtitles.count)개의 Subtitle 모델 생성 완료")
             }
         } catch {
-            print("❌ callJavaScript 실행 에러: \(error.localizedDescription)")
+            print("❌ 추출 실패: \(error.localizedDescription)")
         }
     }
 }
