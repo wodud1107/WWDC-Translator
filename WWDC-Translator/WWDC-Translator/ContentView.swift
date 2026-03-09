@@ -11,7 +11,8 @@ import WebKit
 struct ContentView: View {
     @State private var year: String = ""
     @State private var sessionNumber: String = ""
-    @State private var url: URL? = URL(string: "https://developer.apple.com/videos/")
+    
+    @State private var page = WebPage()
     
     var body: some View {
         VStack(spacing: 0) {
@@ -44,11 +45,12 @@ struct ContentView: View {
             #endif
             .shadow(radius: 2)
             
-            if let url {
-                WebView(url: url)
-                    .ignoresSafeArea(edges: .bottom)
-            } else {
-                ContentUnavailableView("URL을 로드할 수 없습니다.", systemImage: "network.slash")
+            WebView(page)
+                .ignoresSafeArea(edges: .bottom)
+        }
+        .onAppear {
+            if let initialURL = URL(string: "https://developer.apple.com/videos/") {
+                page.load(initialURL)
             }
         }
     }
@@ -57,7 +59,7 @@ struct ContentView: View {
         // WWDC 세션 URL 패턴: https://developer.apple.com/videos/play/wwdc{year}/{sessionNumber}/
         let sessionURLString = "https://developer.apple.com/videos/play/wwdc\(year)/\(sessionNumber)/"
         if let newURL = URL(string: sessionURLString) {
-            self.url = newURL
+            page.load(newURL)
         }
     }
 }
