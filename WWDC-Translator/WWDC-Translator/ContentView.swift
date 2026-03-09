@@ -14,10 +14,13 @@ struct ContentView: View {
     
     @State private var page = WebPage()
     @State private var isExtracting: Bool = false
+    @State private var translationProgress: Double = 0.0
     
-    // 추출된 데이터 저장
+    // 추출 및 번역된 데이터 저장
     @State private var m3u8URL: String?
     @State private var subtitles: [Subtitle] = []
+    
+    private let deepLService = DeepLService()
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -42,6 +45,14 @@ struct ContentView: View {
                         .buttonStyle(.borderedProminent)
                         .disabled(year.isEmpty || sessionNumber.isEmpty)
                     }
+                    
+                    // 번역 진행률 표시
+                    if isExtracting && translationProgress > 0 {
+                        ProgressView(value: translationProgress, total: 1.0)
+                            .progressViewStyle(.linear)
+                            .tint(.blue)
+                            .padding(.horizontal)
+                    }
                 }
                 .padding()
                 #if os(macOS)
@@ -59,7 +70,7 @@ struct ContentView: View {
             if let currentURL = page.url, currentURL.absoluteString.contains("play") {
                 Button {
                     Task {
-                        await extractTranscriptData()
+                        await extractAndTranslate()
                     }
                 } label: {
                     HStack {
@@ -68,7 +79,7 @@ struct ContentView: View {
                                 .controlSize(.small)
                                 .tint(.white)
                                 .padding(.trailing, 4)
-                            Text("추출 중...")
+                            Text(translationProgress > 0 ? "\(Int(translationProgress * 100))% 번역 중..." : "추출 중...")
                         } else {
                             Image(systemName: "captions.bubble.fill")
                             Text("한국어 자막으로 보기")
@@ -101,14 +112,15 @@ struct ContentView: View {
             page.load(newURL)
             self.m3u8URL = nil
             self.subtitles = []
+            self.translationProgress = 0
         }
     }
     
-    // 자막 데이터 추출 로직
+    // 자막 데이터 추출과 동시에 번역
     @MainActor
-    private func extractTranscriptData() async {
-        print("🔍 전사문 스크래핑 시작...")
+    private func extractAndTranslate() async {
         isExtracting = true
+        translationProgress = 0
         defer { isExtracting = false }
         
         let dataScript = """
@@ -125,12 +137,7 @@ struct ContentView: View {
                 var s = sentences[i];
                 var timeSpan = s.querySelector('[data-start]');
                 var start = timeSpan ? timeSpan.getAttribute('data-start') : (s.getAttribute('data-start-time') || "0");
-                
-                // 텍스트 추출
-                var text = s.textContent.trim();
-                if (text.length > 0) {
-                    results.push(start + "|" + text);
-                }
+                results.push(start + "|" + s.textContent.trim());
             }
             
             if (results.length === 0) return "ERROR:NO_DATA";
@@ -144,12 +151,12 @@ struct ContentView: View {
         do {
             guard let rawString = try await page.callJavaScript(dataScript) as? String,
                   !rawString.hasPrefix("ERROR:") else {
-                print("⚠️ 자막 데이터를 가져오지 못했습니다.")
+                print("⚠️ 데이터를 가져오지 못했습니다.")
                 return
             }
             
             let components = rawString.components(separatedBy: "###")
-            self.m3u8URL = components.first == "" ? nil : components.first
+            self.m3u8URL = components.first
             
             if components.count > 1 {
                 let lines = components[1].components(separatedBy: "@@@")
@@ -162,21 +169,52 @@ struct ContentView: View {
                     }
                 }
                 
-                // 종료 시간 계산
                 for i in 0..<newSubtitles.count {
-                    if i < newSubtitles.count - 1 {
-                        newSubtitles[i].endTime = newSubtitles[i+1].startTime
-                    } else {
-                        newSubtitles[i].endTime = newSubtitles[i].startTime + 3.0
-                    }
+                    newSubtitles[i].endTime = (i < newSubtitles.count - 1) ? newSubtitles[i+1].startTime : newSubtitles[i].startTime + 3.0
                 }
                 
                 self.subtitles = newSubtitles
-                print("✅ 성공: \(self.subtitles.count)개의 Subtitle 모델 생성 완료")
+                print("✅ \(self.subtitles.count)개 자막 추출 완료. 번역 시작...")
+                
+                // 번역 실행
+                await performTranslation()
             }
         } catch {
-            print("❌ 추출 실패: \(error.localizedDescription)")
+            print("❌ 추출 및 번역 프로세스 실패: \(error.localizedDescription)")
         }
+    }
+    
+    // 배치 번역 수행
+    private func performTranslation() async {
+        let batchSize = 30
+        var totalProcessed = 0
+        let totalCount = subtitles.count
+        
+        for i in stride(from: 0, to: totalCount, by: batchSize) {
+            let end = min(i + batchSize, totalCount)
+            let chunk = subtitles[i..<end]
+            
+            // 구분자(|||)와 함께 텍스트 병합하여 API 호출 최소화
+            let combinedText = chunk.map { $0.text }.joined(separator: "\n|||\n")
+            
+            do {
+                let translatedCombined = try await deepLService.translate(combinedText)
+                let translatedLines = translatedCombined.components(separatedBy: "|||")
+                
+                await MainActor.run {
+                    for (index, subIndex) in (i..<end).enumerated() {
+                        if index < translatedLines.count {
+                            subtitles[subIndex].translatedText = translatedLines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+                        }
+                    }
+                    totalProcessed = end
+                    self.translationProgress = Double(totalProcessed) / Double(totalCount)
+                }
+            } catch {
+                print("❌ 번역 중 에러 (Batch \(i)): \(error)")
+            }
+        }
+        print("✅ 모든 자막 번역 완료!")
     }
 }
 
