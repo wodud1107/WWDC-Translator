@@ -16,9 +16,11 @@ struct ContentView: View {
     @State private var isExtracting: Bool = false
     @State private var translationProgress: Double = 0.0
     
-    // 추출 및 번역된 데이터 저장
+    // 추출 및 번역된 데이터
     @State private var m3u8URL: String?
     @State private var subtitles: [Subtitle] = []
+    
+    @State private var isShowingPlayer: Bool = false
     
     private let deepLService = DeepLService()
     
@@ -67,7 +69,7 @@ struct ContentView: View {
                     .ignoresSafeArea(edges: .bottom)
             }
             
-            if let currentURL = page.url, currentURL.absoluteString.contains("play") {
+            if let currentURL = page.url, currentURL.absoluteString.contains("play") && !isShowingPlayer {
                 Button {
                     Task {
                         await extractAndTranslate()
@@ -98,11 +100,39 @@ struct ContentView: View {
                 .disabled(isExtracting)
                 .transition(.scale.combined(with: .opacity))
             }
+            #if os(macOS)
+            if isShowingPlayer {
+                playerView
+                    .background(Color.black)
+                    .transition(.move(edge: .bottom))
+                    .zIndex(10) // 최상단에 배치
+            }
+            #endif
         }
         .onAppear {
             if let initialURL = URL(string: "https://developer.apple.com/videos/") {
                 page.load(initialURL)
             }
+        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $isShowingPlayer) {
+            playerView
+        }
+        #endif
+    }
+    
+    // 번역 완료 후 비디오 URL을 이용한 플레이어 실행
+    @ViewBuilder
+    private var playerView: some View {
+        if let urlString = m3u8URL, let videoURL = URL(string: urlString) {
+            VideoPlayerView(videoURL: videoURL, subtitles: subtitles)
+        } else {
+            ContentUnavailableView("비디오 주소를 찾을 수 없습니다.", systemImage: "video.slash")
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        isShowingPlayer = false
+                    }
+                }
         }
     }
     
@@ -178,16 +208,22 @@ struct ContentView: View {
                 
                 // 번역 실행
                 await performTranslation()
+                
+                // 번역 완료 후 플레이어 표시
+                await MainActor.run {
+                    withAnimation {
+                        self.isShowingPlayer = true
+                    }
+                }
             }
         } catch {
-            print("❌ 추출 및 번역 프로세스 실패: \(error.localizedDescription)")
+            print("❌ 프로세스 실패: \(error.localizedDescription)")
         }
     }
     
     // 배치 번역 수행
     private func performTranslation() async {
         let batchSize = 30
-        var totalProcessed = 0
         let totalCount = subtitles.count
         
         for i in stride(from: 0, to: totalCount, by: batchSize) {
@@ -207,11 +243,10 @@ struct ContentView: View {
                             subtitles[subIndex].translatedText = translatedLines[index].trimmingCharacters(in: .whitespacesAndNewlines)
                         }
                     }
-                    totalProcessed = end
-                    self.translationProgress = Double(totalProcessed) / Double(totalCount)
+                    self.translationProgress = Double(end) / Double(totalCount)
                 }
             } catch {
-                print("❌ 번역 중 에러 (Batch \(i)): \(error)")
+                print("❌ 번역 중 에러: \(error)")
             }
         }
         print("✅ 모든 자막 번역 완료!")
