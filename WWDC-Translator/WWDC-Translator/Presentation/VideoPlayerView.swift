@@ -11,7 +11,7 @@ import AVKit
 struct VideoPlayerView: View {
     let videoURL: URL
     let subtitles: [Subtitle]
-    @Environment(\.dismiss) var dismiss
+    var onClose: () -> Void
     
     @State private var player = AVPlayer()
     @State private var currentTime: Double = 0.0
@@ -60,7 +60,7 @@ struct VideoPlayerView: View {
         .overlay(alignment: .topLeading) {
             Button {
                 player.pause()
-                dismiss()
+                onClose()
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.largeTitle)
@@ -73,5 +73,5 @@ struct VideoPlayerView: View {
 }
 
 #Preview {
-    VideoPlayerView(videoURL: URL(string: "https://devstreaming-cdn.apple.com/videos/wwdc/2016/416k7f0xkmz28rvlvwb/416/hls_vod_mvp.m3u8")!, subtitles: [])
+    VideoPlayerView(videoURL: URL(string: "https://devstreaming-cdn.apple.com/videos/wwdc/2016/416k7f0xkmz28rvlvwb/416/hls_vod_mvp.m3u8")!, subtitles: [], onClose: {})
 }

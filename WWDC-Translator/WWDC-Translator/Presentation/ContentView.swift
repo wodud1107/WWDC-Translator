@@ -69,6 +69,7 @@ struct ContentView: View {
                 #endif
                 .shadow(radius: 2)
                 .zIndex(1)
+                .disabled(isShowingPlayer)
                 
                 WebView(page)
                     .ignoresSafeArea(edges: .bottom)
@@ -103,6 +104,7 @@ struct ContentView: View {
                 .disabled(isExtracting)
                 .transition(.scale.combined(with: .opacity))
             }
+            
             #if os(macOS)
             if isShowingPlayer {
                 playerView
@@ -143,10 +145,13 @@ struct ContentView: View {
         #endif
     }
     
+    // 번역 완료 후 비디오 URL을 이용한 플레이어 실행
     @ViewBuilder
     private var playerView: some View {
         if let urlString = m3u8URL, let videoURL = URL(string: urlString) {
-            VideoPlayerView(videoURL: videoURL, subtitles: subtitles)
+            VideoPlayerView(videoURL: videoURL, subtitles: subtitles) {
+                self.isShowingPlayer = false
+            }
         } else {
             ContentUnavailableView("비디오 주소를 찾을 수 없습니다.", systemImage: "video.slash")
                 .onAppear {
