@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WebKit
+import Translation
 
 struct ContentView: View {
     @State private var year: String = ""
@@ -16,13 +17,13 @@ struct ContentView: View {
     @State private var isExtracting: Bool = false
     @State private var translationProgress: Double = 0.0
     
+    @State private var translationConfig: TranslationSession.Configuration?
+    
     // 추출 및 번역된 데이터
     @State private var m3u8URL: String?
     @State private var subtitles: [Subtitle] = []
     
     @State private var isShowingPlayer: Bool = false
-    
-    private let deepLService = DeepLService()
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -71,9 +72,7 @@ struct ContentView: View {
             
             if let currentURL = page.url, currentURL.absoluteString.contains("play") && !isShowingPlayer {
                 Button {
-                    Task {
-                        await extractAndTranslate()
-                    }
+                    prepareTranslation()
                 } label: {
                     HStack {
                         if isExtracting {
@@ -81,7 +80,7 @@ struct ContentView: View {
                                 .controlSize(.small)
                                 .tint(.white)
                                 .padding(.trailing, 4)
-                            Text(translationProgress > 0 ? "\(Int(translationProgress * 100))% 번역 중..." : "추출 중...")
+                            Text(translationProgress > 0 ? "시스템 번역 중..." : "데이터 추출 중...")
                         } else {
                             Image(systemName: "captions.bubble.fill")
                             Text("한국어 자막으로 보기")
@@ -114,6 +113,15 @@ struct ContentView: View {
                 page.load(initialURL)
             }
         }
+        // 시스템 번역 태스크 등록 (translationConfig가 설정되면 자동으로 실행됨)
+        .translationTask(translationConfig) { session in
+            do {
+                try await performSystemTranslation(with: session)
+            } catch {
+                print("❌ 시스템 번역 에러: \(error)")
+                await MainActor.run { isExtracting = false }
+            }
+        }
         #if os(iOS)
         .fullScreenCover(isPresented: $isShowingPlayer) {
             playerView
@@ -143,133 +151,104 @@ struct ContentView: View {
             self.m3u8URL = nil
             self.subtitles = []
             self.translationProgress = 0
+            self.translationConfig = nil
         }
     }
     
-    // 자막 데이터 추출과 동시에 번역
-    @MainActor
-    private func extractAndTranslate() async {
+    // 1단계: 자막 데이터 추출 및 시스템 번역 트리거
+    private func prepareTranslation() {
         isExtracting = true
         translationProgress = 0
-        defer { isExtracting = false }
         
-        let dataScript = """
-        try {
-            // 1. 비디오 URL 추출 (meta 우선, video 차선)
+        Task {
+            let dataScript = """
             var metaVideo = document.querySelector('meta[property="og:video"]');
             var m3u8 = metaVideo ? metaVideo.content : "";
             
-            // 2. 자막 텍스트 추출
             var sentences = document.querySelectorAll('#transcript-content .sentence, .supplement.transcript .sentence, .sentence');
-            var results = [];
-            
+            var out = "";
             for (var i = 0; i < sentences.length; i++) {
                 var s = sentences[i];
                 var timeSpan = s.querySelector('[data-start]');
                 var start = timeSpan ? timeSpan.getAttribute('data-start') : (s.getAttribute('data-start-time') || "0");
-                results.push(start + "|" + s.textContent.trim());
+                out += start + "|" + s.textContent.trim() + "@@@";
             }
-            
-            if (results.length === 0) return "ERROR:NO_DATA";
-            
-            return m3u8 + "###" + results.join("@@@");
-        } catch (e) {
-            return "ERROR:" + e.message;
-        }
-        """
-        
-        do {
-            guard let rawString = try await page.callJavaScript(dataScript) as? String,
-                  !rawString.hasPrefix("ERROR:") else {
-                print("⚠️ 데이터를 가져오지 못했습니다.")
-                return
-            }
-            
-            let components = rawString.components(separatedBy: "###")
-            self.m3u8URL = components.first
-            
-            if components.count > 1 {
-                let lines = components[1].components(separatedBy: "@@@")
-                var newSubtitles: [Subtitle] = []
-                
-                for line in lines {
-                    let parts = line.components(separatedBy: "|")
-                    if parts.count == 2 {
-                        newSubtitles.append(Subtitle(startTime: Double(parts[0]) ?? 0.0, endTime: 0.0, text: parts[1]))
-                    }
-                }
-                
-                for i in 0..<newSubtitles.count {
-                    newSubtitles[i].endTime = (i < newSubtitles.count - 1) ? newSubtitles[i+1].startTime : newSubtitles[i].startTime + 3.0
-                }
-                
-                self.subtitles = newSubtitles
-                print("✅ \(self.subtitles.count)개 자막 추출 완료. 번역 시작...")
-                
-                // 번역 실행
-                await performTranslation()
-                
-                // 번역 완료 후 플레이어 표시
-                await MainActor.run {
-                    withAnimation {
-                        self.isShowingPlayer = true
-                    }
-                }
-            }
-        } catch {
-            print("❌ 프로세스 실패: \(error.localizedDescription)")
-        }
-    }
-    
-    // 배치 번역 수행 (XML 태그 보호 로직 적용)
-    private func performTranslation() async {
-        let batchSize = 30
-        let totalCount = subtitles.count
-        
-        for i in stride(from: 0, to: totalCount, by: batchSize) {
-            let end = min(i + batchSize, totalCount)
-            let chunk = Array(subtitles[i..<end])
-            
-            // 각 문장을 <sN> 태그로 감싸서 전송 (DeepL이 문장을 합치는 것을 방지)
-            var xmlText = ""
-            for (index, subtitle) in chunk.enumerated() {
-                xmlText += "<s\(index)>\(subtitle.text)</s\(index)> "
-            }
+            return m3u8 + "###" + out;
+            """
             
             do {
-                let translatedXML = try await deepLService.translate(xmlText)
+                let result = try await page.callJavaScript(dataScript)
+                guard let rawString = result as? String, !rawString.isEmpty else { 
+                    await MainActor.run { isExtracting = false }
+                    return 
+                }
                 
-                await MainActor.run {
-                    for (index, subIndex) in (i..<end).enumerated() {
-                        let tag = "s\(index)"
-                        if let translatedSentence = extractText(from: translatedXML, tag: tag) {
-                            subtitles[subIndex].translatedText = translatedSentence
-                        } else {
-                            subtitles[subIndex].translatedText = subtitles[subIndex].text
+                let components = rawString.components(separatedBy: "###")
+                let videoURL = components.first == "" ? nil : components.first
+                
+                if components.count > 1 && !components[1].isEmpty {
+                    let lines = components[1].components(separatedBy: "@@@")
+                    var newSubtitles: [Subtitle] = []
+                    
+                    for line in lines where !line.isEmpty {
+                        let parts = line.components(separatedBy: "|")
+                        if parts.count == 2 {
+                            newSubtitles.append(Subtitle(startTime: Double(parts[0]) ?? 0.0, endTime: 0.0, text: parts[1]))
                         }
                     }
-                    self.translationProgress = Double(end) / Double(totalCount)
+                    
+                    for i in 0..<newSubtitles.count {
+                        newSubtitles[i].endTime = (i < newSubtitles.count - 1) ? newSubtitles[i+1].startTime : newSubtitles[i].startTime + 3.0
+                    }
+                    
+                    await MainActor.run {
+                        self.m3u8URL = videoURL
+                        self.subtitles = newSubtitles
+                        self.translationProgress = 0.1 // 번역 시작 신호
+                        
+                        // 시스템 번역 세션 구성
+                        if self.translationConfig == nil {
+                            self.translationConfig = .init(source: Locale.Language(identifier: "en"),
+                                                         target: Locale.Language(identifier: "ko"))
+                        } else {
+                            // 이미 존재할 경우 무효화 후 재설정하여 task 재실행
+                            let old = self.translationConfig
+                            self.translationConfig = nil
+                            self.translationConfig = old
+                        }
+                    }
+                } else {
+                    await MainActor.run { isExtracting = false }
                 }
             } catch {
-                print("❌ 번역 중 에러: \(error)")
+                print("❌ 스크립트 실행 에러: \(error)")
+                await MainActor.run { isExtracting = false }
             }
         }
     }
     
-    // XML 태그 내부 텍스트 추출 헬퍼
-    private func extractText(from xml: String, tag: String) -> String? {
-        let startTag = "<\(tag)>"
-        let endTag = "</\(tag)>"
+    // 2단계: 시스템 번역 세션을 통한 실제 번역
+    private func performSystemTranslation(with session: TranslationSession) async throws {
+        let totalCount = subtitles.count
+        guard totalCount > 0 else { return }
         
-        guard let startRange = xml.range(of: startTag),
-              let endRange = xml.range(of: endTag) else { return nil }
+        // 시스템 번역은 배열 요청 시 순서와 싱크 일치를 완벽히 보장함
+        let requests: [TranslationSession.Request] = subtitles.enumerated().map { (index, subtitle) in
+            TranslationSession.Request(sourceText: subtitle.text, clientIdentifier: "\(index)")
+        }
         
-        return String(xml[startRange.upperBound..<endRange.lowerBound])
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
+        let translatedResults = try await session.translations(from: requests)
+        
+        await MainActor.run {
+            for result in translatedResults {
+                if let indexString = result.clientIdentifier, let index = Int(indexString) {
+                    subtitles[index].translatedText = result.targetText
+                }
+            }
+            self.translationProgress = 1.0
+            self.isExtracting = false
+            self.isShowingPlayer = true
+        }
     }
 }
 
