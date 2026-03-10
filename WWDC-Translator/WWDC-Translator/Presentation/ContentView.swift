@@ -17,6 +17,7 @@ struct ContentView: View {
     @State private var isExtracting: Bool = false
     @State private var translationProgress: Double = 0.0
     
+    // 시스템 번역 세션 관리를 위한 설정
     @State private var translationConfig: TranslationSession.Configuration?
     
     // 추출 및 번역된 데이터
@@ -24,6 +25,9 @@ struct ContentView: View {
     @State private var subtitles: [Subtitle] = []
     
     @State private var isShowingPlayer: Bool = false
+    
+    @State private var errorMessage: String?
+    @State private var isShowingError: Bool = false
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -113,14 +117,24 @@ struct ContentView: View {
                 page.load(initialURL)
             }
         }
-        // 시스템 번역 태스크 등록 (translationConfig가 설정되면 자동으로 실행됨)
+        // 시스템 번역 태스크 등록
         .translationTask(translationConfig) { session in
             do {
                 try await performSystemTranslation(with: session)
             } catch {
                 print("❌ 시스템 번역 에러: \(error)")
-                await MainActor.run { isExtracting = false }
+                await MainActor.run {
+                    self.errorMessage = "번역 중 오류가 발생했습니다. (패키지 다운로드 확인 필요)"
+                    self.isShowingError = true
+                    self.isExtracting = false
+                    self.translationConfig = nil // 설정 초기화하여 재시도 가능하게 함
+                }
             }
+        }
+        .alert("알림", isPresented: $isShowingError) {
+            Button("확인", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "알 수 없는 오류가 발생했습니다.")
         }
         #if os(iOS)
         .fullScreenCover(isPresented: $isShowingPlayer) {
@@ -129,7 +143,6 @@ struct ContentView: View {
         #endif
     }
     
-    // 번역 완료 후 비디오 URL을 이용한 플레이어 실행
     @ViewBuilder
     private var playerView: some View {
         if let urlString = m3u8URL, let videoURL = URL(string: urlString) {
@@ -206,15 +219,17 @@ struct ContentView: View {
                         self.subtitles = newSubtitles
                         self.translationProgress = 0.1 // 번역 시작 신호
                         
-                        // 시스템 번역 세션 구성
+                        // 시스템 번역 트리거
                         if self.translationConfig == nil {
                             self.translationConfig = .init(source: Locale.Language(identifier: "en"),
                                                          target: Locale.Language(identifier: "ko"))
                         } else {
-                            // 이미 존재할 경우 무효화 후 재설정하여 task 재실행
-                            let old = self.translationConfig
+                            // 설정이 이미 있다면 무효화 후 재설정
                             self.translationConfig = nil
-                            self.translationConfig = old
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                self.translationConfig = .init(source: Locale.Language(identifier: "en"),
+                                                             target: Locale.Language(identifier: "ko"))
+                            }
                         }
                     }
                 } else {
