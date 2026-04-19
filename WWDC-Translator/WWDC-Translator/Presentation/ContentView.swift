@@ -150,16 +150,25 @@ struct ContentView: View {
     private var playerView: some View {
         if let urlString = m3u8URL, let videoURL = URL(string: urlString) {
             VideoPlayerView(videoURL: videoURL, subtitles: subtitles) {
-                self.isShowingPlayer = false
+                closePlayer()
             }
         } else {
             ContentUnavailableView("비디오 주소를 찾을 수 없습니다.", systemImage: "video.slash")
                 .onAppear {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        isShowingPlayer = false
+                        closePlayer()
                     }
                 }
         }
+    }
+    
+    private func closePlayer() {
+        self.isShowingPlayer = false
+        // 다음 재생을 위해 데이터 초기화
+        self.m3u8URL = nil
+        self.subtitles = []
+        self.translationProgress = 0
+        self.translationConfig = nil
     }
     
     private func goToSession() {
@@ -222,28 +231,49 @@ struct ContentView: View {
                     await MainActor.run {
                         self.m3u8URL = videoURL
                         self.subtitles = newSubtitles
+                        
+                        if newSubtitles.isEmpty {
+                            self.isExtracting = false
+                            if videoURL != nil {
+                                self.isShowingPlayer = true
+                            } else {
+                                self.errorMessage = "비디오 또는 자막 데이터를 찾을 수 없습니다."
+                                self.isShowingError = true
+                            }
+                            return
+                        }
+                        
                         self.translationProgress = 0.1 // 번역 시작 신호
                         
                         // 시스템 번역 트리거
-                        if self.translationConfig == nil {
-                            self.translationConfig = .init(source: Locale.Language(identifier: "en"),
-                                                         target: Locale.Language(identifier: "ko"))
-                        } else {
-                            // 설정이 이미 있다면 무효화 후 재설정
-                            self.translationConfig = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                self.translationConfig = .init(source: Locale.Language(identifier: "en"),
-                                                             target: Locale.Language(identifier: "ko"))
-                            }
-                        }
+                        triggerTranslation()
                     }
                 } else {
-                    await MainActor.run { isExtracting = false }
+                    await MainActor.run { 
+                        self.isExtracting = false
+                        if let vURL = videoURL {
+                            self.m3u8URL = vURL
+                            self.isShowingPlayer = true
+                        } else {
+                            self.errorMessage = "데이터를 추출할 수 없습니다."
+                            self.isShowingError = true
+                        }
+                    }
                 }
             } catch {
                 print("❌ 스크립트 실행 에러: \(error)")
                 await MainActor.run { isExtracting = false }
             }
+        }
+    }
+    
+    private func triggerTranslation() {
+        // 기존 설정을 nil로 만들었다가 다시 설정하여 translationTask가 확실히 트리거되도록 함
+        self.translationConfig = nil
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.translationConfig = .init(source: Locale.Language(identifier: "en"),
+                                         target: Locale.Language(identifier: "ko"))
         }
     }
     

@@ -13,8 +13,9 @@ struct VideoPlayerView: View {
     let subtitles: [Subtitle]
     var onClose: () -> Void
     
-    @State private var player = AVPlayer()
+    @State private var player: AVPlayer = AVPlayer()
     @State private var currentTime: Double = 0.0
+    @State private var timeObserver: Any?
     
     // 현재 시간에 맞는 자막 찾기
     private var currentSubtitle: String? {
@@ -25,13 +26,10 @@ struct VideoPlayerView: View {
         ZStack(alignment: .bottom) {
             VideoPlayer(player: player)
                 .onAppear {
-                    player.replaceCurrentItem(with: AVPlayerItem(url: videoURL))
-                    player.play()
-                    
-                    // 재생 시간 트래킹 (0.1초 단위)
-                    player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { time in
-                        self.currentTime = time.seconds
-                    }
+                    setupPlayer()
+                }
+                .onDisappear {
+                    cleanupPlayer()
                 }
             
             // 자막 오버레이
@@ -59,7 +57,6 @@ struct VideoPlayerView: View {
         .edgesIgnoringSafeArea(.all)
         .overlay(alignment: .topLeading) {
             Button {
-                player.pause()
                 onClose()
             } label: {
                 Image(systemName: "xmark.circle.fill")
@@ -69,6 +66,26 @@ struct VideoPlayerView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+    
+    private func setupPlayer() {
+        let playerItem = AVPlayerItem(url: videoURL)
+        player.replaceCurrentItem(with: playerItem)
+        player.play()
+        
+        // 재생 시간 트래킹 (0.1초 단위)
+        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { time in
+            self.currentTime = time.seconds
+        }
+    }
+    
+    private func cleanupPlayer() {
+        player.pause()
+        if let observer = timeObserver {
+            player.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+        player.replaceCurrentItem(with: nil)
     }
 }
 
