@@ -249,22 +249,32 @@ struct ContentView: View {
     
     // 2단계: 시스템 번역 세션을 통한 실제 번역
     private func performSystemTranslation(with session: TranslationSession) async throws {
-        let totalCount = subtitles.count
-        guard totalCount > 0 else { return }
+        guard !subtitles.isEmpty else { return }
         
-        // 시스템 번역은 배열 요청 시 순서와 싱크 일치를 완벽히 보장함
-        let requests: [TranslationSession.Request] = subtitles.enumerated().map { (index, subtitle) in
-            TranslationSession.Request(sourceText: subtitle.text, clientIdentifier: "\(index)")
+        let chunkSize = 50 // 한 번에 요청할 번역 청크 사이즈
+        for i in stride(from: 0, to: subtitles.count, by: chunkSize) {
+            let end = min(i + chunkSize, subtitles.count)
+            let chunk = subtitles[i..<end]
+            
+            let requests: [TranslationSession.Request] = chunk.enumerated().map { (offset, subtitle) in
+                // 기존처럼 배열 index를 쓰거나 고유 ID 활용
+                TranslationSession.Request(sourceText: subtitle.text, clientIdentifier: "\(i + offset)")
+            }
+            
+            let translatedResults = try await session.translations(from: requests)
+            
+            await MainActor.run {
+                for result in translatedResults {
+                    if let indexString = result.clientIdentifier, let index = Int(indexString) {
+                        subtitles[index].translatedText = result.targetText
+                    }
+                }
+                // 진행률 업데이트를 청크마다 갱신할 수도 있습니다.
+                self.translationProgress = Double(end) / Double(subtitles.count)
+            }
         }
         
-        let translatedResults = try await session.translations(from: requests)
-        
         await MainActor.run {
-            for result in translatedResults {
-                if let indexString = result.clientIdentifier, let index = Int(indexString) {
-                    subtitles[index].translatedText = result.targetText
-                }
-            }
             self.translationProgress = 1.0
             self.isExtracting = false
             self.isShowingPlayer = true
