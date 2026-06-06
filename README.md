@@ -1,23 +1,49 @@
-# WWDC-Translator
-WWDC 영상 학습 중 한국어 자막이 없는 불편함을 해결하기 위해 개발된 **개인용 실시간 자막 번역 앱**입니다.
+# WWDC Translator
 
-## 🛠 Tech Stack
-- **Framework**: SwiftUI, WebKit, AVKit, Translation
-- **SDK**: iOS 26.0+, macOS 26.0+
-- **Language**: Swift 6.0
+WWDC Translator는 WWDC 세션 학습 중 한국어 자막이 없는 불편을 줄이기 위해 만든 개인용 실시간 자막 번역 앱입니다.
+WWDC 페이지의 transcript를 가져오고, Apple Translation Framework로 번역한 뒤, AVPlayer 재생 시간에 맞춰 영상 위에 자막을 표시합니다.
 
-## 🚀 바이브 코딩
-본 프로젝트는 **빠른 기능 구현과 실질적인 문제 해결**에 초점을 맞춘 **바이브 코딩** 으로 진행되었습니다. 
-- 복잡한 아키텍처 설계보다는 **SwiftUI의 생산성**을 극대화하여 아이디어를 즉시 앱으로 구체화했습니다.
-- 시스템 내장 프레임워크를 적극 활용하여 외부 의존성(API Key 등) 없이도 동작하는 완성도 높은 MVP를 단기간에 구현했습니다.
+사용 영상 https://developer.apple.com/videos/play/wwdc2016/416/
+<img alt="스크린샷 2026-03-10 오전 2 34 34" src="https://github.com/user-attachments/assets/a1981b7a-b705-4675-b827-8383871d4ccb" />
 
-## ✅ 주요 구현 기능 (v1.1.0 - Apple Translation Framework 기반)
-- **고속 자막 스크래핑**: `WebKit`의 최신 API를 활용하여 WWDC 웹페이지에서 전사문 데이터와 시간 정보를 초고속으로 추출합니다.
-- **Apple Translation Framework 통합**: 외부 API 비용 걱정 없는 **무료 번역** 및 기기 내부 Neural Engine을 활용한 **오프라인 번역**을 지원합니다.
-- **완벽한 문장 동기화**: 시스템 번역 세션의 배열 번역 기능을 활용하여, 별도의 XML 태그 처리 없이도 원문과 번역문의 **1:1 매칭 및 정확한 싱크**를 보장합니다.
-- **실시간 자막 오버레이**: `AVPlayer` 재생 시간(0.1초 단위)과 연동되어 번역된 자막을 비디오 위에 정확히 렌더링합니다.
-- **멀티플랫폼 지원**: iOS와 macOS 환경에서 최적화된 플레이어 UI 및 상호작용을 제공합니다.
+## Tech Stack
 
-## 📍 Next Step
-- **아키텍처 리팩토링**: `ContentView`에 집중된 로직을 MVVM 패턴으로 분리하여 가독성과 유지보수성을 개선할 예정입니다.
-- **네이티브 경험 고도화**: WebView 의존도를 낮추고 데이터 계층을 네이티브 통신으로 재작성하여 앱의 반응 속도를 개선할 계획입니다.
+- SwiftUI
+- WebKit
+- AVKit
+- Apple Translation Framework
+- Swift 6
+
+## Why
+
+WWDC 세션은 원문 transcript가 잘 제공되지만, 영상 재생 시간과 한국어 이해 흐름을 동시에 맞추기는 번거롭습니다.
+외부 번역 API 비용이나 API key 관리 없이, Apple 시스템 프레임워크만으로 학습용 MVP를 빠르게 검증하는 것을 목표로 했습니다.
+
+## Core Flow
+
+1. 사용자가 WWDC 세션 URL을 입력합니다.
+2. WebKit으로 WWDC 페이지의 transcript와 시작 시간을 추출합니다.
+3. Apple Translation Framework로 원문 transcript를 한국어로 번역합니다.
+4. AVPlayer의 재생 시간을 관찰해 현재 시점에 맞는 자막을 영상 위에 렌더링합니다.
+
+## Key Decisions
+
+### 외부 번역 API 없는 MVP
+
+번역 API를 사용하면 비용, API key 관리, 네트워크 의존성이 생깁니다.
+Apple Translation Framework를 사용해 시스템 번역 세션 기반으로 동작하도록 만들고, 개인 학습 도구로서 필요한 가치를 먼저 검증했습니다.
+
+### Transcript와 영상 시간 싱크 연결
+
+번역문이 영상 시간과 맞지 않으면 실제 학습 도구로 쓰기 어렵습니다.
+WWDC transcript의 시간 정보와 AVPlayer time observer를 연결해 현재 재생 시점에 맞는 자막을 표시했습니다.
+
+### 기능 검증 이후 구조 개선
+
+초기 버전은 문제 해결 여부를 빠르게 확인하기 위해 ContentView 중심으로 구현했습니다.
+다음 단계에서는 transcript 추출, 번역 세션, player sync를 ViewModel과 서비스 계층으로 분리해 유지보수성을 높일 계획입니다.
+
+## Current Status
+
+현재 버전은 개인 학습 문제를 제품 형태로 검증한 Prototype입니다.
+이후 WebView 의존도를 낮추고, 네이티브 데이터 계층과 MVVM 구조로 리팩토링할 예정입니다.
